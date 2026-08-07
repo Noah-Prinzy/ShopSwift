@@ -1,0 +1,57 @@
+# syntax=docker/dockerfile:1
+
+# ShopSwift is compiled in Linux so Vapor's Unix-oriented dependencies never
+# use the native Windows Swift toolchain.
+FROM swift:6.3.3-jammy AS builder
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libpq-dev \
+        libssl-dev \
+        pkg-config \
+        zlib1g-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /build
+
+# Resolve dependencies in a cacheable layer before copying application code.
+COPY Package.swift Package.resolved ./
+RUN --mount=type=cache,id=shopswift-swiftpm,target=/build/.build \
+    swift package resolve
+
+COPY Sources ./Sources
+COPY Tests ./Tests
+COPY Public ./Public
+COPY Resources ./Resources
+
+RUN --mount=type=cache,id=shopswift-swiftpm,target=/build/.build \
+    swift build -c debug --product Run --jobs 4 \
+    && mkdir -p /output \
+    && cp "$(swift build -c debug --show-bin-path)/Run" /output/Run
+
+# The official slim image supplies the Swift Linux runtime without retaining
+# compilers, package checkouts, or other build-only files.
+FROM swift:6.3.3-jammy-slim AS runtime
+
+RUN apt-get update \
+    && DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
+        ca-certificates \
+        libssl3 \
+        tzdata \
+    && rm -rf /var/lib/apt/lists/* \
+    && useradd --system --uid 10001 --create-home vapor
+
+WORKDIR /app
+
+COPY --from=builder /output/Run ./Run
+COPY --from=builder /build/Public ./Public
+COPY --from=builder /build/Resources ./Resources
+
+RUN chown -R vapor:vapor /app
+USER vapor
+
+EXPOSE 8080
+
+ENTRYPOINT ["./Run"]
+CMD ["serve", "--env", "development"]

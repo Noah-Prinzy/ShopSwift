@@ -1,0 +1,17 @@
+{
+  "name": "ShopSwift",
+  "short_name": "ShopSwift",
+  "start_url": "/",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#ffffff",
+  "theme_color": "#5b3df5",
+  "description": "A modern electronics storefront powered by Swift, Vapor and PostgreSQL.",
+  "categories": ["shopping", "business", "lifestyle"],
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" },
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "maskable" }
+  ]
+}

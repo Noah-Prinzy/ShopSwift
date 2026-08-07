@@ -1,0 +1,65 @@
+## Docker Compose for local development
+## Short notes:
+## - `postgres`: local PostgreSQL for development (exposed on host port 5433).
+## - `flyway`: runs Flyway migrations from `Resources/db/migration` and exits.
+## - `app`: builds and runs the Vapor server inside a Linux container.
+## Keep `.env` values in sync with the `.env.example` file for portable runs.
+
+services:
+  postgres:
+    image: postgres:18-alpine
+    environment:
+      POSTGRES_DB: ${DATABASE_NAME:-shopswift_db}
+      POSTGRES_USER: ${DATABASE_USERNAME:-shopswift_user}
+      POSTGRES_PASSWORD: ${DATABASE_PASSWORD:-change_me}
+    ports:
+      - "5433:5432"
+    volumes:
+      - shopswift_postgres:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${DATABASE_USERNAME:-shopswift_user} -d ${DATABASE_NAME:-shopswift_db}"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Flyway runs SQL migrations and exits. Re-run this service whenever a new Vn__*.sql file is added.
+  flyway:
+    image: redgate/flyway:latest
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: >
+      -url=jdbc:postgresql://postgres:5432/${DATABASE_NAME:-shopswift_db}
+      -user=${DATABASE_USERNAME:-shopswift_user}
+      -password=${DATABASE_PASSWORD:-change_me}
+      -connectRetries=20
+      migrate
+    volumes:
+      - ./Resources/db/migration:/flyway/sql:ro
+
+  # Vapor builds and runs in Linux because some transitive server dependencies
+  # require Unix headers that are unavailable to the native Windows toolchain.
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      APP_ENV: ${APP_ENV:-development}
+      # Containers reach PostgreSQL through its Compose service name and
+      # internal port. Windows tools continue to use localhost:5433.
+      DATABASE_HOST: postgres
+      DATABASE_PORT: 5432
+      DATABASE_NAME: ${DATABASE_NAME:-shopswift_db}
+      DATABASE_USERNAME: ${DATABASE_USERNAME:-shopswift_user}
+      DATABASE_PASSWORD: ${DATABASE_PASSWORD:-change_me}
+      # Binding to all container interfaces exposes Vapor through port 8080.
+      HOST: 0.0.0.0
+      PORT: 8080
+    ports:
+      - "8080:8080"
+
+volumes:
+  shopswift_postgres:
