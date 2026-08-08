@@ -16,7 +16,8 @@ const state = {
   featuredProducts: [],
   catalogProducts: [],
   cart: { items: [], total: 0 },
-  catalogRequest: 0
+  catalogRequest: 0,
+  activePage: null
 };
 
 const money = new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD' });
@@ -137,8 +138,17 @@ function updateAccountNavigation() {
 
 function updateCartCount() {
   const count = state.cart.items.reduce((total, item) => total + item.quantity, 0);
-  $('cart-count').textContent = String(count);
-  $('cart-count').setAttribute('aria-label', `${count} ${count === 1 ? 'item' : 'items'} in cart`);
+  const countBadge = $('cart-count');
+  const previousCount = Number.parseInt(countBadge.textContent, 10) || 0;
+  countBadge.textContent = String(count);
+  countBadge.setAttribute('aria-label', `${count} ${count === 1 ? 'item' : 'items'} in cart`);
+
+  if (count !== previousCount && window.matchMedia('(prefers-reduced-motion: no-preference)').matches) {
+    countBadge.classList.remove('pop');
+    void countBadge.offsetWidth;
+    countBadge.classList.add('pop');
+    countBadge.addEventListener('animationend', () => countBadge.classList.remove('pop'), { once: true });
+  }
 }
 
 function getRoute() {
@@ -152,12 +162,26 @@ function getRoute() {
   };
 }
 
+// Re-adding this class restarts the shared hero keyframes whenever a routed
+// animated page becomes active. The forced reflow is intentional and scoped to
+// a single hero page, so Shop/Categories/Login/Home replay without DOM cloning.
+function replayPageAnimation(pageName) {
+  const page = $(`${pageName}-page`);
+  if (!page?.hasAttribute('data-animate-page')) return;
+  page.classList.remove('is-animating');
+  void page.offsetWidth;
+  page.classList.add('is-animating');
+}
+
 // Hash routing keeps the PWA deployable behind Vapor without server-side page
 // rewrites. Dynamic product routes still fetch the canonical REST resource.
 async function route() {
   closeMobileMenu();
   const current = getRoute();
+  const enteringNewPage = state.activePage !== current.name;
   pageNames.forEach((name) => $(`${name}-page`).classList.toggle('hidden', name !== current.name));
+  if (enteringNewPage && ['home', 'shop', 'categories', 'login'].includes(current.name)) replayPageAnimation(current.name);
+  state.activePage = current.name;
   document.querySelectorAll('[data-nav]').forEach((link) => {
     link.classList.toggle('active', link.dataset.nav === current.name || (current.name === 'product' && link.dataset.nav === 'shop'));
   });

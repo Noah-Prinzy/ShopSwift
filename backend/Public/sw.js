@@ -5,7 +5,7 @@
 // - The service worker caches the app shell (`SHELL`) during install.
 // - Navigation requests fallback to the cached root when offline.
 // - API endpoints under `/api/` are always fetched from network to keep data live.
-const CACHE = 'shopswift-shell-v2';
+const CACHE = 'shopswift-shell-v3';
 const SHELL = ['/', '/styles.css', '/app.js', '/manifest.webmanifest', '/icon.svg'];
 self.addEventListener('install', (event) => event.waitUntil(caches.open(CACHE).then((cache) => cache.addAll(SHELL))));
 self.addEventListener('activate', (event) => event.waitUntil(
