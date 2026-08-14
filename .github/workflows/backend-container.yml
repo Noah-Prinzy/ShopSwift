@@ -14,9 +14,67 @@ permissions:
 jobs:
   docker-build:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Checkout
         uses: actions/checkout@v4
 
       - name: Build ShopSwift backend image
         run: docker build --tag shopswift-backend:check ./backend
+
+      - name: Start PostgreSQL 18
+        run: |
+          docker network create shopswift-smoke
+          docker run --detach \
+            --name shopswift-postgres \
+            --network shopswift-smoke \
+            --env POSTGRES_DB=shopswift_db \
+            --env POSTGRES_USER=shopswift_user \
+            --env POSTGRES_PASSWORD=shopswift_password \
+            postgres:18-alpine
+
+          for attempt in {1..30}; do
+            if docker exec shopswift-postgres pg_isready -U shopswift_user -d shopswift_db; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          docker logs shopswift-postgres
+          exit 1
+
+      - name: Start ShopSwift backend
+        run: |
+          docker run --detach \
+            --name shopswift-app \
+            --network shopswift-smoke \
+            --publish 18080:8080 \
+            --env APP_ENV=development \
+            --env HOST=0.0.0.0 \
+            --env PORT=8080 \
+            --env DATABASE_HOST=shopswift-postgres \
+            --env DATABASE_PORT=5432 \
+            --env DATABASE_NAME=shopswift_db \
+            --env DATABASE_USERNAME=shopswift_user \
+            --env DATABASE_PASSWORD=shopswift_password \
+            shopswift-backend:check
+
+      - name: Verify migrations and health endpoint
+        run: |
+          for attempt in {1..60}; do
+            if curl --fail --silent --show-error http://127.0.0.1:18080/health; then
+              exit 0
+            fi
+            sleep 2
+          done
+
+          echo "ShopSwift backend did not become healthy."
+          docker logs shopswift-app
+          docker logs shopswift-postgres
+          exit 1
+
+      - name: Cleanup smoke-test containers
+        if: always()
+        run: |
+          docker rm --force shopswift-app shopswift-postgres 2>/dev/null || true
+          docker network rm shopswift-smoke 2>/dev/null || true
