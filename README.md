@@ -2,6 +2,10 @@
 
 A working shopping prototype architecture built around **SwiftUI + Vapor + PostgreSQL + Flyway**.
 
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/Noah-Prinzy/ShopSwift)
+
+> **Production deployment:** the Render Blueprint in `render.yaml` creates the public Vapor web service and PostgreSQL 18 database together. Vapor also serves the PWA from `backend/Public`, so the Render service URL can run the complete ShopSwift prototype on one origin while the Vercel frontend is being connected to that backend.
+
 ## Phase 1 features
 
 - Account signup with unique username + unique email + password
