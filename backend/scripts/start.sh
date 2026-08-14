@@ -14,9 +14,21 @@ DATABASE_USERNAME="${DATABASE_USERNAME:-shopswift_user}"
 DATABASE_PASSWORD="${DATABASE_PASSWORD:-change_me}"
 APP_ENV="${APP_ENV:-production}"
 
+# Hosted providers commonly expose a libpq-style connection string such as:
+# postgresql://user:password@host:5432/database
+# Vapor can consume DATABASE_URL directly. Flyway needs JDBC syntax, so strip the
+# credential prefix from the URL and pass the credentials separately.
+if [[ -n "${DATABASE_URL:-}" ]]; then
+  database_target="${DATABASE_URL#*://}"
+  database_target="${database_target#*@}"
+  FLYWAY_URL="jdbc:postgresql://${database_target}"
+else
+  FLYWAY_URL="jdbc:postgresql://${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}"
+fi
+
 printf 'Applying ShopSwift database migrations...\n'
 flyway \
-  -url="jdbc:postgresql://${DATABASE_HOST}:${DATABASE_PORT}/${DATABASE_NAME}" \
+  -url="${FLYWAY_URL}" \
   -user="${DATABASE_USERNAME}" \
   -password="${DATABASE_PASSWORD}" \
   -locations="filesystem:/app/Resources/db/migration" \
