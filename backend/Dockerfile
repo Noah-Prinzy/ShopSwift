@@ -20,8 +20,10 @@ RUN apt-get update \
 
 WORKDIR /build
 
-# Resolve dependencies in a cacheable layer before copying application code.
-COPY Package.swift Package.resolved ./
+# Package.resolved is intentionally not required here because it is not tracked
+# in this repository. SwiftPM resolves dependencies from Package.swift in clean
+# cloud builds, matching what a fresh deployment environment actually has.
+COPY Package.swift ./
 RUN --mount=type=cache,id=shopswift-swiftpm,target=/build/.build \
     swift package resolve
 
